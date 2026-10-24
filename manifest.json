@@ -1,7 +1,16 @@
 {
   "version": "6.3.24",
-  "url": "https://raw.githubusercontent.com/zpevakp-ui/mereni-pro-updates/main/releases/mereni-pro-v2-etapa-6-3-24.zip.b64",
-  "encoding": "base64",
-  "sha256": "e76a6a05a3dc5d16251065713aefc50a350dbf98c9fb562376ea5b780c800f53",
-  "notes": "Test automatické aktualizace. Verze 6.3.24 upravuje aktualizační stránku a označení verze."
+  "files": [
+    {
+      "path": "layout.php",
+      "url": "https://raw.githubusercontent.com/zpevakp-ui/mereni-pro-updates/main/versions/6.3.24/layout.php",
+      "sha256": "b95128e5f69dee1b20155c48b3f1c4b9c5311966a6219e139c48b723f776b0b9"
+    },
+    {
+      "path": "mp-auto-updater.php",
+      "url": "https://raw.githubusercontent.com/zpevakp-ui/mereni-pro-updates/main/versions/6.3.24/mp-auto-updater.php",
+      "sha256": "7e4378b706665f82fdc23f976bbc0fa07098b2c0f710992af33109c213929691"
+    }
+  ],
+  "notes": "Test automatické aktualizace z verze 6.3.23 na 6.3.24."
 }
