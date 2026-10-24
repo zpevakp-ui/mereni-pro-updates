@@ -5,9 +5,24 @@ require_admin();
 const MP_CURRENT_VERSION = '6.3.24';
 const MP_UPDATE_MANIFEST = 'https://raw.githubusercontent.com/zpevakp-ui/mereni-pro-updates/main/manifest.json';
 
+if (!class_exists('ZipArchive')) {
+    http_response_code(500);
+    exit('Na serveru není dostupné rozšíření PHP ZipArchive.');
+}
+
 $message = '';
 $error = '';
 $available = null;
+
+function rrmdir_mp_auto($dir) {
+    if (!is_dir($dir)) return;
+    foreach (scandir($dir) as $item) {
+        if ($item === '.' || $item === '..') continue;
+        $path = $dir . DIRECTORY_SEPARATOR . $item;
+        if (is_dir($path) && !is_link($path)) rrmdir_mp_auto($path); else @unlink($path);
+    }
+    @rmdir($dir);
+}
 
 function safe_rel_mp_auto($name) {
     $name = str_replace('\\', '/', $name);
@@ -69,7 +84,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['install_update'])) {
     check_csrf();
     try {
         $manifest = load_manifest_mp_auto();
-        if (version_compare($manifest['version'], MP_CURRENT_VERSION, '<=')) throw new RuntimeException('Novější verze není k dispozici.');
+        if (version_compare($manifest['version'], MP_CURRENT_VERSION, '<=')) {
+            throw new RuntimeException('Novější verze není k dispozici.');
+        }
+
         $root = realpath(__DIR__);
         if (!$root) throw new RuntimeException('Nelze určit adresář aplikace.');
         $tmpBase = $root . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . '.mp-update';
@@ -77,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['install_update'])) {
         $run = $tmpBase . DIRECTORY_SEPARATOR . bin2hex(random_bytes(8));
         $backup = $run . DIRECTORY_SEPARATOR . 'backup';
         if (!mkdir($backup, 0755, true)) throw new RuntimeException('Nelze připravit zálohu aktualizace.');
+
         $changed = 0;
         foreach ($manifest['files'] as $file) {
             $rel = safe_rel_mp_auto($file['path']);
