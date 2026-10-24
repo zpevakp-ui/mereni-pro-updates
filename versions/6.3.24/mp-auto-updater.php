@@ -1,0 +1,128 @@
+<?php
+require __DIR__ . '/db.php';
+require_admin();
+
+const MP_CURRENT_VERSION = '6.3.24';
+const MP_UPDATE_MANIFEST = 'https://raw.githubusercontent.com/zpevakp-ui/mereni-pro-updates/main/manifest.json';
+
+$message = '';
+$error = '';
+$available = null;
+
+function safe_rel_mp_auto($name) {
+    $name = str_replace('\\', '/', $name);
+    $name = ltrim($name, '/');
+    if ($name === '' || strpos($name, "\0") !== false) return false;
+    foreach (explode('/', $name) as $part) if ($part === '..') return false;
+    return $name;
+}
+
+function http_get_mp_auto($url, $timeout = 20) {
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, array(
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_USERAGENT => 'MERENI-PRO-Updater/' . MP_CURRENT_VERSION,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ));
+        $body = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+        if ($body === false || $code < 200 || $code >= 300) {
+            throw new RuntimeException('Stažení z GitHubu selhalo' . ($err ? ': ' . $err : ' (HTTP ' . $code . ')') . '.');
+        }
+        return $body;
+    }
+    if (!ini_get('allow_url_fopen')) throw new RuntimeException('Server nepovoluje HTTPS stahování (chybí cURL i allow_url_fopen).');
+    $ctx = stream_context_create(array('http' => array('timeout' => $timeout, 'header' => "User-Agent: MERENI-PRO-Updater/" . MP_CURRENT_VERSION . "\r\n")));
+    $body = @file_get_contents($url, false, $ctx);
+    if ($body === false) throw new RuntimeException('Stažení z GitHubu selhalo.');
+    return $body;
+}
+
+function load_manifest_mp_auto() {
+    $raw = http_get_mp_auto(MP_UPDATE_MANIFEST, 12);
+    $m = json_decode($raw, true);
+    if (!is_array($m) || empty($m['version']) || !isset($m['files']) || !is_array($m['files'])) {
+        throw new RuntimeException('Manifest aktualizace má neplatný formát.');
+    }
+    foreach ($m['files'] as $f) {
+        if (empty($f['path']) || empty($f['url']) || empty($f['sha256'])) throw new RuntimeException('Manifest obsahuje neúplný soubor.');
+        if (safe_rel_mp_auto($f['path']) === false || $f['path'] === 'config.php' || strpos($f['path'], 'data/') === 0) throw new RuntimeException('Manifest obsahuje nepovolenou cestu.');
+        if (!preg_match('~^https://raw\.githubusercontent\.com/zpevakp-ui/mereni-pro-updates/~', $f['url'])) throw new RuntimeException('Manifest obsahuje nepovolenou adresu souboru.');
+        if (!preg_match('/^[a-f0-9]{64}$/i', $f['sha256'])) throw new RuntimeException('Manifest obsahuje neplatný SHA-256.');
+    }
+    return $m;
+}
+
+try {
+    $available = load_manifest_mp_auto();
+} catch (Throwable $e) {
+    $error = 'Kontrola aktualizací: ' . $e->getMessage();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['install_update'])) {
+    check_csrf();
+    try {
+        $manifest = load_manifest_mp_auto();
+        if (version_compare($manifest['version'], MP_CURRENT_VERSION, '<=')) throw new RuntimeException('Novější verze není k dispozici.');
+        $root = realpath(__DIR__);
+        if (!$root) throw new RuntimeException('Nelze určit adresář aplikace.');
+        $tmpBase = $root . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . '.mp-update';
+        if (!is_dir($tmpBase) && !mkdir($tmpBase, 0755, true)) throw new RuntimeException('Nelze vytvořit dočasný adresář aktualizace.');
+        $run = $tmpBase . DIRECTORY_SEPARATOR . bin2hex(random_bytes(8));
+        $backup = $run . DIRECTORY_SEPARATOR . 'backup';
+        if (!mkdir($backup, 0755, true)) throw new RuntimeException('Nelze připravit zálohu aktualizace.');
+        $changed = 0;
+        foreach ($manifest['files'] as $file) {
+            $rel = safe_rel_mp_auto($file['path']);
+            if ($rel === false || $rel === 'config.php' || strpos($rel, 'data/') === 0) throw new RuntimeException('Nepovolená cesta v aktualizaci.');
+            $content = http_get_mp_auto($file['url'], 30);
+            if (!empty($file['encoding']) && $file['encoding'] === 'base64') {
+                $decoded = base64_decode(trim($content), true);
+                if ($decoded === false) throw new RuntimeException('Soubor ' . $rel . ' nelze dekódovat.');
+                $content = $decoded;
+            }
+            if (!hash_equals(strtolower($file['sha256']), strtolower(hash('sha256', $content)))) throw new RuntimeException('Kontrolní součet nesouhlasí: ' . $rel);
+            $dst = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel);
+            if (!is_dir(dirname($dst)) && !mkdir(dirname($dst), 0755, true)) throw new RuntimeException('Nelze vytvořit adresář: ' . $rel);
+            if (is_file($dst)) {
+                $bak = $backup . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel);
+                if (!is_dir(dirname($bak)) && !mkdir(dirname($bak), 0755, true)) throw new RuntimeException('Nelze vytvořit zálohu.');
+                if (!copy($dst, $bak)) throw new RuntimeException('Nelze zálohovat: ' . $rel);
+            }
+            $tmp = $dst . '.mp-new';
+            if (file_put_contents($tmp, $content) === false) throw new RuntimeException('Nelze uložit: ' . $rel);
+            if (!@rename($tmp, $dst)) { @unlink($tmp); throw new RuntimeException('Nelze nahradit: ' . $rel); }
+            $changed++;
+        }
+        $message = 'Aktualizace na verzi ' . $manifest['version'] . ' byla dokončena. Aktualizováno souborů: ' . $changed . '. config.php a data zůstaly beze změny.';
+        $available = $manifest;
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+    }
+}
+?><!doctype html>
+<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aktualizace · MĚŘENÍ PRO</title><link rel="stylesheet" href="style.css?v=6.3.24">
+<style>.updater{max-width:760px;margin:40px auto}.updater-card{background:#fff;border:1px solid #d7e0e4;border-radius:12px;padding:24px}.ok{padding:12px;background:#e8f5ee;border:1px solid #9ac8ad;border-radius:8px}.err{padding:12px;background:#fff0f0;border:1px solid #dfaaaa;border-radius:8px}.muted{color:#60727b}.version-box{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}.version-box>div{padding:14px;border:1px solid #d7e0e4;border-radius:8px}.version{font-size:1.35rem;font-weight:700}</style>
+</head><body><main class="updater"><div class="updater-card">
+<h1>Aktualizace MĚŘENÍ PRO</h1>
+<p class="muted">Automatický aktualizátor přes GitHub. Přístup má pouze přihlášený administrátor.</p>
+<?php if ($message): ?><p class="ok"><?php echo h($message); ?></p><?php endif; ?>
+<?php if ($error): ?><p class="err"><?php echo h($error); ?></p><?php endif; ?>
+<div class="version-box"><div><span class="muted">Nainstalovaná verze</span><div class="version"><?php echo h(MP_CURRENT_VERSION); ?></div></div><div><span class="muted">Dostupná verze</span><div class="version"><?php echo $available ? h($available['version']) : '—'; ?></div></div></div>
+<?php if ($available && version_compare($available['version'], MP_CURRENT_VERSION, '>')): ?>
+<form method="post" onsubmit="return confirm('Nainstalovat verzi <?php echo h($available['version']); ?>? Před přepsáním souborů se vytvoří záloha.');">
+<input type="hidden" name="csrf" value="<?php echo h(csrf_token()); ?>">
+<input type="hidden" name="install_update" value="1">
+<button class="btn" type="submit">Nainstalovat verzi <?php echo h($available['version']); ?></button>
+</form>
+<?php elseif ($available): ?><p class="ok">Používáte nejnovější dostupnou verzi.</p><?php endif; ?>
+<p style="margin-top:18px"><a class="btn secondary" href="index.php">Zpět do aplikace</a></p>
+<p class="muted" style="margin-top:18px">Aktualizační soubory se stahují přímo z GitHubu a každý se před instalací ověřuje SHA-256. <code>config.php</code> a adresář <code>data/</code> se nepřepisují.</p>
+</div></main></body></html>
