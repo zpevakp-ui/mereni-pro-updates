@@ -1,26 +1,5 @@
 {
-  "version": "6.3.26",
-  "notes": "Import XLSX podle existujících bodů: pouze Bod a Naměřeno [lx], bez změny geometrie bodů.",
-  "files": [
-    {
-      "path": "room-measurement.php",
-      "url": "https://raw.githubusercontent.com/zpevakp-ui/mereni-pro-updates/main/updates/6.3.26/room-measurement.php",
-      "sha256": "dcc3068027d01205b0b18ff7c8782ed3dde8bc4a59fa97d064c20fb09e43c299"
-    },
-    {
-      "path": "layout.php",
-      "url": "https://raw.githubusercontent.com/zpevakp-ui/mereni-pro-updates/main/updates/6.3.26/layout.php",
-      "sha256": "371a7cfdeb66a0ac9b656e09e0bb42248918635a2ec975850b6070c01aab4d7e"
-    },
-    {
-      "path": "mp-auto-updater.php",
-      "url": "https://raw.githubusercontent.com/zpevakp-ui/mereni-pro-updates/main/updates/6.3.26/mp-auto-updater.php",
-      "sha256": "d1feb905b3d4a5de1c6b0b0966eddd70d35ac71a76f462a731da4e1f753d0d2e"
-    },
-    {
-      "path": "vzor-import-merici-body.xlsx",
-      "url": "https://raw.githubusercontent.com/zpevakp-ui/mereni-pro-updates/main/updates/6.3.26/vzor-import-merici-body.xlsx",
-      "sha256": "76df4b4c96e859dea4925b99ec12ad56a010fd01213902f25ad0622bdfcd2d5b"
-    }
-  ]
+  "version": "6.3.25",
+  "notes": "Stabilní verze. Aktualizace 6.3.26 je dočasně stažena kvůli kontrole integrity souborů.",
+  "files": []
 }
