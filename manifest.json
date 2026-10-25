@@ -1,7 +1,7 @@
 {
-  "version": "6.3.26",
-  "notes": "Aktualizační kanál je připraven. Používáte aktuální stabilní verzi.",
-  "url": "https://raw.githubusercontent.com/zpevakp-ui/mereni-pro-updates/main/MERENI-PRO-6.3.28.zip.b64",
-  "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "version": "6.3.27",
+  "notes": "Test automatické instalace. Aktualizuje pouze samotný automatický aktualizátor.",
+  "url": "https://raw.githubusercontent.com/zpevakp-ui/mereni-pro-updates/main/MERENI-PRO-6.3.27.zip.b64",
+  "sha256": "9f0b974f2c580b3c451ff5755ab509cc13a5bf44c85923e2247c42119c2c0312",
   "encoding": "base64"
 }
