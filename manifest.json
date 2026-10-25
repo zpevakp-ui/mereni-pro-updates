@@ -1,5 +1,7 @@
 {
-  "version": "6.3.25",
-  "notes": "Stabilní verze. Aktualizace 6.3.26 je dočasně stažena kvůli kontrole integrity souborů.",
-  "files": []
+  "version": "6.3.26",
+  "notes": "Aktualizační kanál je připraven. Používáte aktuální stabilní verzi.",
+  "url": "https://raw.githubusercontent.com/zpevakp-ui/mereni-pro-updates/main/MERENI-PRO-6.3.28.zip.b64",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "encoding": "base64"
 }
